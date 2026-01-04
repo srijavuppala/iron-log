@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://your-backend-url.railway.app/:path*"
+            "destination": "https://iron-log-production.up.railway.app/:path*"
         }
     ],
     "headers": [
