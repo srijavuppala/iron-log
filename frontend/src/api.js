@@ -1,8 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'https://iron-log-production.up.railway.app',
+    baseURL: 'https://iron-log-production.up.railway.app',
 });
+
+console.log("API Base URL:", api.defaults.baseURL);
 
 // Add a request interceptor to include the session token
 api.interceptors.request.use((config) => {
