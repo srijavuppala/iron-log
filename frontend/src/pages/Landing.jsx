@@ -1,7 +1,4 @@
-import React from 'react';
-import { useAuth } from '../context/AuthContext';
-import { GoogleLogin } from '@react-oauth/google';
-import { Dumbbell } from 'lucide-react';
+import Auth from '../components/Auth';
 
 export default function Landing() {
     const { handleGoogleLogin } = useAuth();
@@ -15,24 +12,33 @@ export default function Landing() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main relative overflow-hidden">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main relative overflow-hidden py-10">
             {/* Background Gradients */}
             <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px]" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[100px]" />
 
-            <div className="z-10 flex flex-col items-center gap-8 text-center px-4">
+            <div className="z-10 flex flex-col items-center gap-8 text-center px-4 w-full max-w-md">
                 <div className="flex items-center gap-2 mb-4 animate-fade-in">
                     <Dumbbell className="w-10 h-10 text-primary" />
                     <h1 className="text-4xl font-heading font-bold tracking-tighter">IRONLOG</h1>
                 </div>
 
-                <p className="text-xl text-text-muted max-w-md animate-slide-up">
+                <p className="text-xl text-text-muted animate-slide-up mb-4">
                     Track your workouts without the rigid schedules.
                     <span className="text-text-main font-semibold"> Push. Pull. Legs. Core. Cardio.</span>
-                    <br />Any day, your way.
                 </p>
 
-                <div className="mt-8 scale-125 transform hover:scale-[1.3] transition-transform">
+                <div className="w-full animate-slide-up delay-100">
+                    <Auth />
+                </div>
+
+                <div className="relative w-full flex items-center gap-4 text-text-muted text-sm">
+                    <div className="h-px bg-white/10 flex-1" />
+                    <span>OR</span>
+                    <div className="h-px bg-white/10 flex-1" />
+                </div>
+
+                <div className="scale-110 transform hover:scale-[1.12] transition-transform">
                     <GoogleLogin
                         onSuccess={handleGoogleLogin}
                         onError={() => {

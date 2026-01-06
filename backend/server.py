@@ -3,6 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Workout, User
 from odmantic import ObjectId
 import httpx
+from passlib.context import CryptContext
+from typing import Optional
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 app = FastAPI(title="Ironlog API")
 
@@ -22,8 +32,44 @@ async def root():
 # Auth
 from pydantic import BaseModel
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 class GoogleAuthRequest(BaseModel):
     token: str
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest):
+    # Check if user exists
+    existing_user = await engine.find_one(User, User.email == request.email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(request.password)
+    user = User(
+        email=request.email,
+        password_hash=hashed_password,
+        name=request.name
+    )
+    await engine.save(user)
+    
+    session_token = f"sess_uid_{user.id}"
+    return {"user": user, "session_token": session_token}
+
+@app.post("/auth/login")
+async def login(request: LoginRequest):
+    user = await engine.find_one(User, User.email == request.email)
+    if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+    session_token = f"sess_uid_{user.id}"
+    return {"user": user, "session_token": session_token}
 
 @app.post("/auth/google")
 async def google_auth(request: GoogleAuthRequest):
@@ -86,14 +132,23 @@ async def google_auth(request: GoogleAuthRequest):
 
 @app.get("/me")
 async def get_me(session_token: str = ""):
-    if not session_token or not session_token.startswith("session_"):
+    if not session_token:
         raise HTTPException(status_code=401, detail="Invalid session")
     
-    google_id = session_token.replace("session_", "")
-    user = await engine.find_one(User, User.google_id == google_id)
+    user = None
+    if session_token.startswith("sess_uid_"):
+        user_id_str = session_token.replace("sess_uid_", "")
+        try:
+            user_id = ObjectId(user_id_str)
+            user = await engine.find_one(User, User.id == user_id)
+        except:
+             pass
+    elif session_token.startswith("session_"):
+        google_id = session_token.replace("session_", "")
+        user = await engine.find_one(User, User.google_id == google_id)
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=401, detail="User not found or session invalid")
     
     return user
 
@@ -101,10 +156,13 @@ async def get_me(session_token: str = ""):
 async def create_workout(workout_data: dict, session_token: str = ""):
     try:
         # Extract user_id from session token
-        if not session_token or not session_token.startswith("session_"):
+        user_id = None
+        if session_token.startswith("sess_uid_"):
+            user_id = session_token.replace("sess_uid_", "")
+        elif session_token.startswith("session_"):
+            user_id = session_token.replace("session_", "")
+        else:
             raise HTTPException(status_code=401, detail="Invalid session")
-        
-        user_id = session_token.replace("session_", "")
         
         # Create workout with user_id
         workout = Workout(
@@ -134,10 +192,13 @@ async def create_workout(workout_data: dict, session_token: str = ""):
 @app.get("/workouts")
 async def get_workouts(session_token: str = ""):
     try:
-        if not session_token or not session_token.startswith("session_"):
+        user_id = None
+        if session_token.startswith("sess_uid_"):
+            user_id = session_token.replace("sess_uid_", "")
+        elif session_token.startswith("session_"):
+            user_id = session_token.replace("session_", "")
+        else:
             raise HTTPException(status_code=401, detail="Invalid session")
-        
-        user_id = session_token.replace("session_", "")
         workouts = await engine.find(Workout, Workout.user_id == user_id, sort=Workout.date.desc())
         return workouts
     except Exception as e:

@@ -25,6 +25,34 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const login = async (email, password) => {
+        try {
+            const response = await api.post('/auth/login', { email, password });
+            const { user: userData, session_token } = response.data;
+            localStorage.setItem('ironlog_token', session_token);
+            localStorage.setItem('ironlog_user', JSON.stringify(userData));
+            setUser(userData);
+            return { success: true };
+        } catch (error) {
+            console.error('Login failed', error);
+            return { success: false, error: error.response?.data?.detail || 'Login failed' };
+        }
+    };
+
+    const register = async (name, email, password) => {
+        try {
+            const response = await api.post('/auth/register', { name, email, password });
+            const { user: userData, session_token } = response.data;
+            localStorage.setItem('ironlog_token', session_token);
+            localStorage.setItem('ironlog_user', JSON.stringify(userData));
+            setUser(userData);
+            return { success: true };
+        } catch (error) {
+            console.error('Registration failed', error);
+            return { success: false, error: error.response?.data?.detail || 'Registration failed' };
+        }
+    };
+
     useEffect(() => {
         // Check local storage on load
         const token = localStorage.getItem('ironlog_token');
@@ -43,7 +71,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, handleGoogleLogin, logout, loading }}>
+        <AuthContext.Provider value={{ user, handleGoogleLogin, login, register, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

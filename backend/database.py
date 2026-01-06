@@ -28,7 +28,8 @@ class Workout(Model):
 
 class User(Model):
     email: str = Field(unique=True)
-    google_id: str = Field(unique=True)
+    google_id: Optional[str] = None
+    password_hash: Optional[str] = None
     name: str
     avatar_url: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
