@@ -8,5 +8,16 @@
             "source": "/api/:path*",
             "destination": "https://iron-log-production.up.railway.app/:path*"
         }
+    ],
+    "headers": [
+        {
+            "source": "/(.*)",
+            "headers": [
+                {
+                    "key": "Cross-Origin-Opener-Policy",
+                    "value": "same-origin-allow-popups"
+                }
+            ]
+        }
     ]
 }
