@@ -3,13 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Workout, User
 from odmantic import ObjectId
 import httpx
+import os
 
 app = FastAPI(title="Ironlog API")
 
-# CORS
+# CORS - Read from environment variable or use defaults
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+allowed_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
+print(f"[CORS] Allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for local dev ease, restrict in prod
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,8 +34,11 @@ class GoogleAuthRequest(BaseModel):
 @app.post("/auth/google")
 async def google_auth(request: GoogleAuthRequest):
     try:
+        print(f"[AUTH] Received login request, token length: {len(request.token)}")
+
         # TEMPORARY: Dev bypass for testing while OAuth propagates
         if request.token == "dev_bypass_token":
+            print("[AUTH] Using dev bypass")
             google_id = "dev_user_123"
             user = await engine.find_one(User, User.google_id == google_id)
             if not user:
@@ -42,30 +51,42 @@ async def google_auth(request: GoogleAuthRequest):
                 await engine.save(user)
             session_token = f"session_{google_id}"
             return {"user": user, "session_token": session_token}
-        
+
         # Real Google token verification
+        print("[AUTH] Verifying token with Google...")
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"https://oauth2.googleapis.com/tokeninfo?id_token={request.token}"
             )
-            
+
+            print(f"[AUTH] Google response status: {response.status_code}")
+
             if response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid token")
-            
+                error_detail = response.text
+                print(f"[AUTH] Token verification failed: {error_detail}")
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"Invalid token - Google returned {response.status_code}: {error_detail}"
+                )
+
             token_info = response.json()
-            
+            print(f"[AUTH] Token info received: email={token_info.get('email')}")
+
             # Extract user info from token
             google_id = token_info.get("sub")
             email = token_info.get("email")
             name = token_info.get("name")
             picture = token_info.get("picture")
-            
+
             if not google_id or not email:
-                raise HTTPException(status_code=401, detail="Invalid token data")
-            
+                print(f"[AUTH] Missing required fields: google_id={google_id}, email={email}")
+                raise HTTPException(status_code=401, detail="Invalid token data - missing required fields")
+
             # Find or create user
+            print(f"[AUTH] Looking up user: {email}")
             user = await engine.find_one(User, User.google_id == google_id)
             if not user:
+                print(f"[AUTH] Creating new user: {email}")
                 user = User(
                     google_id=google_id,
                     email=email,
@@ -73,15 +94,24 @@ async def google_auth(request: GoogleAuthRequest):
                     avatar_url=picture
                 )
                 await engine.save(user)
-            
+            else:
+                print(f"[AUTH] Existing user found: {email}")
+
             # Generate session token (in production, use JWT or similar)
             session_token = f"session_{google_id}"
-            
+
+            print(f"[AUTH] Login successful for: {email}")
             return {"user": user, "session_token": session_token}
-            
+
+    except HTTPException:
+        raise
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to verify token: {str(e)}")
+        print(f"[AUTH] HTTP error during token verification: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to verify token with Google: {str(e)}")
     except Exception as e:
+        print(f"[AUTH] Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
 @app.get("/me")

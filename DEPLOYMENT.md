@@ -108,9 +108,10 @@ Frontend (Vercel) → Backend (Railway/Render) → Database (MongoDB Atlas)
    - Add:
      ```
      MONGO_URL=mongodb+srv://ironlog_user:YOUR_PASSWORD@cluster.mongodb.net/ironlog?retryWrites=true&w=majority
-     CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
+     CORS_ORIGINS=http://localhost:5173
      ```
-   - (You'll update CORS_ORIGINS after deploying frontend)
+   - ⚠️ **IMPORTANT**: You'll update CORS_ORIGINS after deploying frontend
+   - ⚠️ **CRITICAL**: CORS_ORIGINS must include your Vercel URL or login will fail silently!
 
 4. **Generate Domain**
    - Go to "Settings" → "Networking"
@@ -175,13 +176,15 @@ Frontend (Vercel) → Backend (Railway/Render) → Database (MongoDB Atlas)
    - Wait for deployment to complete
    - Copy your frontend URL (e.g., `https://ironlog.vercel.app`)
 
-5. **Update Backend CORS**
+5. **Update Backend CORS** ⚠️ **CRITICAL STEP**
    - Go back to Railway/Render
-   - Update `CORS_ORIGINS` environment variable:
+   - Update `CORS_ORIGINS` environment variable to include your Vercel URL:
      ```
-     CORS_ORIGINS=https://ironlog.vercel.app
+     CORS_ORIGINS=https://ironlog.vercel.app,http://localhost:5173
      ```
-   - Redeploy the backend
+   - Replace `ironlog.vercel.app` with your actual Vercel domain
+   - **Don't forget to redeploy the backend** for changes to take effect!
+   - You can verify CORS is working by checking Railway logs for `[CORS] Allowed origins:`
 
 6. **Update Vercel API Proxy** (Optional)
    - Edit `frontend/vercel.json`
@@ -232,14 +235,52 @@ Frontend (Vercel) → Backend (Railway/Render) → Database (MongoDB Atlas)
 - Check logs in Railway/Render dashboard
 
 ### Frontend can't connect to backend
-- Verify CORS_ORIGINS includes your frontend URL
-- Check VITE_API_URL is correct
+- Verify CORS_ORIGINS includes your frontend URL (comma-separated, no spaces)
+- Check VITE_API_URL is correct (or verify hardcoded URL in `frontend/src/api.js`)
 - Look at browser console for errors
+- Check Railway logs to see if requests are reaching the backend
+
+### Google OAuth login fails silently (no error message)
+This is usually a CORS or Google OAuth configuration issue:
+
+1. **Check CORS Configuration** (Most Common Issue)
+   - Railway: Go to Variables → Verify `CORS_ORIGINS` includes your Vercel URL
+   - Example: `CORS_ORIGINS=https://ironlog.vercel.app,http://localhost:5173`
+   - **Redeploy backend** after changing CORS_ORIGINS
+   - Check Railway logs for: `[CORS] Allowed origins: ['https://ironlog.vercel.app', ...]`
+
+2. **Check Google OAuth Configuration**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/) → Credentials
+   - **Authorized JavaScript origins** must include:
+     - `https://ironlog.vercel.app` (your actual Vercel URL)
+     - `http://localhost:5173`
+   - **Authorized redirect URIs** must include:
+     - `https://ironlog.vercel.app`
+     - `http://localhost:5173`
+   - Changes can take 5-30 minutes to propagate
+
+3. **Check Environment Variables**
+   - Vercel: Verify `VITE_GOOGLE_CLIENT_ID` is set correctly
+   - **Redeploy frontend** after changing environment variables
+
+4. **Debug with Browser Console**
+   - Open DevTools (F12) → Console tab
+   - Try to login
+   - Look for errors starting with `[AUTH]`
+   - Check Network tab for failed requests to `/auth/google`
+
+5. **Check Railway Logs**
+   - Railway dashboard → Deployments → View logs
+   - Look for `[AUTH]` messages to see where login is failing
+   - Common errors:
+     - "Invalid token" = Google OAuth configuration issue
+     - No logs at all = CORS blocking the request
 
 ### Google OAuth not working
-- Verify authorized origins and redirect URIs
+- Verify authorized origins and redirect URIs match your Vercel URL exactly
 - Check VITE_GOOGLE_CLIENT_ID is correct
 - Make sure you're using HTTPS (Vercel provides this automatically)
+- Wait 5-30 minutes after changing Google OAuth settings for changes to propagate
 
 ---
 
