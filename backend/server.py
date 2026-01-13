@@ -208,7 +208,7 @@ async def get_workouts(session_token: str = ""):
 async def delete_workout(id: ObjectId):
     workout = await engine.find_one(Workout, Workout.id == id)
     if not workout:
-        raise HTTPException(status_code=404, message="Workout not found")
+        raise HTTPException(status_code=404, detail="Workout not found")
     await engine.delete(workout)
     return {"message": "Deleted"}
 
